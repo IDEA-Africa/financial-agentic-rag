@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fintech-agentic-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      # Application Configuration (override if needed)
+      - API_VERSION=v1
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+
+      # Security
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:80}
+    volumes:
+      - ./backend/.env:/app/.env:ro
+      - backend_logs:/app/logs
+    networks:
+      - fintech-agentic-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fintech-agentic-frontend
+    ports:
+      - "5173:5173" # Vite dev server port
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend/src:/app/src # Mount source for hot reload
+      - ./frontend/public:/app/public
+    depends_on:
+      - backend
+    networks:
+      - fintech-agentic-network
+    restart: unless-stopped
+
+volumes:
+  backend_logs:
+    driver: local
+
+networks:
+  fintech-agentic-network:
+    driver: bridge
