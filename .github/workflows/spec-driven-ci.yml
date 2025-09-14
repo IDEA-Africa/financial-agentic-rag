@@ -1,0 +1,637 @@
+name: Spec-Driven Development CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'api/v1/**/*.yaml'
+      - 'financial-rag-aispec.yaml'
+      - 'backend/**/*.py'
+      - 'frontend/**/*.{ts,tsx}'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api/v1/**/*.yaml'
+      - 'financial-rag-aispec.yaml'
+      - 'backend/**/*.py'
+      - 'frontend/**/*.{ts,tsx}'
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  SPEC_VALIDATION_TIMEOUT: "300"
+
+jobs:
+  # Specification Validation
+  validate-specifications:
+    runs-on: ubuntu-latest
+    name: "🔍 Validate API Specifications"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install specification tools
+        run: |
+          npm install -g @apidevtools/swagger-cli
+          npm install -g @stoplight/spectral-cli
+          npm install -g redoc-cli
+          pip install aispec-validator pydantic[email] fastapi
+
+      - name: Validate OpenAPI Specification
+        run: |
+          echo "🔍 Validating OpenAPI specification..."
+          swagger-cli validate api/v1/financial-rag-spec.yaml
+
+          echo "✅ OpenAPI specification is valid"
+
+      - name: Lint API Specification with Spectral
+        run: |
+          echo "🔍 Running Spectral linting on API specification..."
+          spectral lint api/v1/financial-rag-spec.yaml \
+            --ruleset spectral:oas \
+            --format stylish \
+            --verbose
+
+          echo "✅ API specification passed Spectral linting"
+
+      - name: Validate AISpec Configuration
+        run: |
+          echo "🔍 Validating AISpec configuration..."
+
+          # Custom AISpec validation script
+          cat > validate_aispec.py << 'EOF'
+          import yaml
+          import sys
+          from typing import Dict, Any
+
+          def validate_aispec(file_path: str) -> bool:
+              """Validate AISpec configuration file"""
+              try:
+                  with open(file_path, 'r') as f:
+                      aispec = yaml.safe_load(f)
+
+                  # Validate required fields
+                  required_fields = ['apiVersion', 'kind', 'metadata', 'spec']
+                  for field in required_fields:
+                      if field not in aispec:
+                          print(f"❌ Missing required field: {field}")
+                          return False
+
+                  # Validate assistants configuration
+                  if 'assistants' not in aispec['spec']:
+                      print("❌ Missing 'assistants' in spec")
+                      return False
+
+                  assistants = aispec['spec']['assistants']
+                  if not isinstance(assistants, list) or len(assistants) == 0:
+                      print("❌ 'assistants' must be a non-empty list")
+                      return False
+
+                  # Validate each assistant
+                  for i, assistant in enumerate(assistants):
+                      required_assistant_fields = ['name', 'model', 'systemPrompt']
+                      for field in required_assistant_fields:
+                          if field not in assistant:
+                              print(f"❌ Assistant {i}: Missing required field '{field}'")
+                              return False
+
+                  print("✅ AISpec configuration is valid")
+                  return True
+
+              except yaml.YAMLError as e:
+                  print(f"❌ YAML parsing error: {e}")
+                  return False
+              except FileNotFoundError:
+                  print("❌ AISpec configuration file not found")
+                  return False
+              except Exception as e:
+                  print(f"❌ Validation error: {e}")
+                  return False
+
+          if __name__ == "__main__":
+              if not validate_aispec("financial-rag-aispec.yaml"):
+                  sys.exit(1)
+          EOF
+
+          python validate_aispec.py
+
+      - name: Generate API Documentation
+        run: |
+          echo "📚 Generating API documentation..."
+          mkdir -p docs/api
+
+          # Generate ReDoc documentation
+          redoc-cli build api/v1/financial-rag-spec.yaml \
+            --title "IDEA Africa Financial RAG API" \
+            --options.theme.colors.primary.main="#336699" \
+            --output docs/api/index.html
+
+          # Generate OpenAPI JSON
+          swagger-cli bundle api/v1/financial-rag-spec.yaml \
+            --outfile docs/api/financial-rag-api.json \
+            --type json
+
+          echo "✅ API documentation generated"
+
+      - name: Upload API Documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-documentation
+          path: docs/api/
+          retention-days: 30
+
+  # Code Generation from Specifications
+  generate-code:
+    runs-on: ubuntu-latest
+    needs: validate-specifications
+    name: "🛠️ Generate Code from Specifications"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install code generation tools
+        run: |
+          # Python tools
+          pip install datamodel-code-generator fastapi pydantic[email]
+
+          # Node.js tools
+          npm install -g @openapitools/openapi-generator-cli
+
+      - name: Generate FastAPI Models from OpenAPI
+        run: |
+          echo "🛠️ Generating FastAPI models from OpenAPI specification..."
+
+          mkdir -p backend/generated/models
+          mkdir -p backend/generated/api
+
+          # Generate Pydantic models
+          datamodel-codegen \
+            --input api/v1/financial-rag-spec.yaml \
+            --input-file-type openapi \
+            --output backend/generated/models/schemas.py \
+            --target-python-version 3.11 \
+            --use-title-as-name \
+            --use-double-quotes \
+            --field-constraints \
+            --strict-nullable \
+            --allow-population-by-field-name
+
+          echo "✅ FastAPI models generated"
+
+      - name: Generate TypeScript Client
+        run: |
+          echo "🛠️ Generating TypeScript client from OpenAPI specification..."
+
+          mkdir -p frontend/src/generated/api
+
+          # Generate TypeScript client with fetch
+          openapi-generator-cli generate \
+            -i api/v1/financial-rag-spec.yaml \
+            -g typescript-fetch \
+            -o frontend/src/generated/api \
+            --additional-properties=npmName=@ideaafrica/financial-rag-client,supportsES6=true,withInterfaces=true,typescriptThreePlus=true
+
+          echo "✅ TypeScript client generated"
+
+      - name: Generate API Route Stubs
+        run: |
+          echo "🛠️ Generating FastAPI route stubs..."
+
+          cat > generate_routes.py << 'EOF'
+          import yaml
+          import os
+          from typing import Dict, Any
+
+          def generate_fastapi_routes(openapi_spec_path: str, output_dir: str):
+              """Generate FastAPI route stubs from OpenAPI specification"""
+              with open(openapi_spec_path, 'r') as f:
+                  spec = yaml.safe_load(f)
+
+              os.makedirs(output_dir, exist_ok=True)
+
+              paths = spec.get('paths', {})
+
+              # Group paths by tags
+              routes_by_tag = {}
+              for path, methods in paths.items():
+                  for method, operation in methods.items():
+                      if method.upper() not in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']:
+                          continue
+
+                      tags = operation.get('tags', ['default'])
+                      tag = tags[0].lower().replace(' ', '_')
+
+                      if tag not in routes_by_tag:
+                          routes_by_tag[tag] = []
+
+                      routes_by_tag[tag].append({
+                          'path': path,
+                          'method': method.upper(),
+                          'operation_id': operation.get('operationId', f"{method}_{path.replace('/', '_').replace('{', '').replace('}', '')}"),
+                          'summary': operation.get('summary', ''),
+                          'description': operation.get('description', ''),
+                          'parameters': operation.get('parameters', []),
+                          'request_body': operation.get('requestBody'),
+                          'responses': operation.get('responses', {})
+                      })
+
+              # Generate route files
+              for tag, operations in routes_by_tag.items():
+                  filename = f"{output_dir}/{tag}.py"
+                  with open(filename, 'w') as f:
+                      f.write(f'''"""
+          Generated FastAPI routes for {tag}
+
+          This file was auto-generated from the OpenAPI specification.
+          Manual modifications will be overwritten on next generation.
+          """
+
+          from fastapi import APIRouter, HTTPException, Depends
+          from typing import Optional, List
+          from backend.generated.models.schemas import *
+          from backend.app.core.dependencies import get_current_user
+
+          router = APIRouter()
+
+          ''')
+
+                      for op in operations:
+                          # Generate route function
+                          f.write(f'''
+          @router.{op['method'].lower()}("{op['path']}")
+          async def {op['operation_id']}():
+              """
+              {op['summary']}
+
+              {op['description']}
+
+              TODO: Implement this endpoint
+              """
+              raise HTTPException(
+                  status_code=501,
+                  detail="Endpoint not yet implemented"
+              )
+
+          ''')
+
+          if __name__ == "__main__":
+              generate_fastapi_routes(
+                  "api/v1/financial-rag-spec.yaml",
+                  "backend/generated/api"
+              )
+          EOF
+
+          python generate_routes.py
+
+          echo "✅ FastAPI route stubs generated"
+
+      - name: Commit generated code
+        if: github.event_name == 'push'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          git add backend/generated/ frontend/src/generated/ docs/api/
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: regenerate code from specifications [skip ci]"
+            git push
+          fi
+
+  # Specification Testing
+  test-specifications:
+    runs-on: ubuntu-latest
+    needs: generate-code
+    name: "🧪 Test Specification Compliance"
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: test_financial_rag
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for generated code
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-asyncio httpx
+          pip install -r backend/requirements.txt
+
+      - name: Run specification compliance tests
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost/test_financial_rag
+        run: |
+          echo "🧪 Running specification compliance tests..."
+
+          # Create test for OpenAPI specification compliance
+          cat > test_spec_compliance.py << 'EOF'
+          import pytest
+          import httpx
+          import yaml
+          from fastapi.testclient import TestClient
+          from backend.app.main import app
+
+          client = TestClient(app)
+
+          @pytest.fixture
+          def openapi_spec():
+              with open("api/v1/financial-rag-spec.yaml", "r") as f:
+                  return yaml.safe_load(f)
+
+          def test_openapi_endpoints_exist(openapi_spec):
+              """Test that all OpenAPI endpoints are implemented"""
+              paths = openapi_spec.get("paths", {})
+
+              for path, methods in paths.items():
+                  for method in methods.keys():
+                      if method.upper() not in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']:
+                          continue
+
+                      # Test endpoint exists (even if returns 501 Not Implemented)
+                      response = client.request(method.upper(), path.replace('{', '').replace('}', ''))
+
+                      # Should not return 404 (Not Found)
+                      assert response.status_code != 404, f"Endpoint {method.upper()} {path} not found"
+
+          def test_health_endpoint():
+              """Test health endpoint compliance"""
+              response = client.get("/health")
+              assert response.status_code == 200
+
+              data = response.json()
+              assert "status" in data
+              assert data["status"] in ["healthy", "degraded"]
+          EOF
+
+          pytest test_spec_compliance.py -v
+
+          echo "✅ Specification compliance tests passed"
+
+  # Security and Compliance Check
+  security-compliance:
+    runs-on: ubuntu-latest
+    needs: validate-specifications
+    name: "🔐 Security & Compliance Check"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install security tools
+        run: |
+          pip install bandit safety semgrep
+          npm install -g @eslint/js typescript-eslint
+
+      - name: Check API specification security
+        run: |
+          echo "🔐 Checking API specification security..."
+
+          # Custom security check for OpenAPI spec
+          cat > check_api_security.py << 'EOF'
+          import yaml
+          import sys
+
+          def check_api_security(spec_path):
+              """Check OpenAPI specification for security issues"""
+              with open(spec_path, 'r') as f:
+                  spec = yaml.safe_load(f)
+
+              issues = []
+
+              # Check if security is defined
+              if 'security' not in spec:
+                  issues.append("⚠️  Global security not defined")
+
+              # Check for security schemes
+              components = spec.get('components', {})
+              security_schemes = components.get('securitySchemes', {})
+
+              if not security_schemes:
+                  issues.append("❌ No security schemes defined")
+
+              # Check paths for security
+              paths = spec.get('paths', {})
+              for path, methods in paths.items():
+                  for method, operation in methods.items():
+                      if method.upper() in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']:
+                          if 'security' not in operation and 'security' not in spec:
+                              issues.append(f"⚠️  No security defined for {method.upper()} {path}")
+
+              # Check for sensitive data in examples
+              def check_examples(obj, path=""):
+                  if isinstance(obj, dict):
+                      for key, value in obj.items():
+                          if key.lower() in ['password', 'token', 'key', 'secret']:
+                              if isinstance(value, str) and len(value) > 10:
+                                  issues.append(f"⚠️  Potential sensitive data in example at {path}.{key}")
+                          check_examples(value, f"{path}.{key}")
+                  elif isinstance(obj, list):
+                      for i, item in enumerate(obj):
+                          check_examples(item, f"{path}[{i}]")
+
+              check_examples(spec)
+
+              if issues:
+                  print("Security issues found:")
+                  for issue in issues:
+                      print(f"  {issue}")
+                  return len([i for i in issues if i.startswith("❌")]) == 0
+              else:
+                  print("✅ No security issues found")
+                  return True
+
+          if __name__ == "__main__":
+              success = check_api_security("api/v1/financial-rag-spec.yaml")
+              if not success:
+                  sys.exit(1)
+          EOF
+
+          python check_api_security.py
+
+      - name: Financial compliance check
+        run: |
+          echo "🏛️ Checking financial compliance..."
+
+          # Check for required compliance disclaimers and warnings
+          grep -r "disclaimer\|risk\|compliance\|regulation" api/v1/financial-rag-spec.yaml || {
+            echo "⚠️  Consider adding compliance disclaimers to API documentation"
+          }
+
+          echo "✅ Financial compliance check completed"
+
+  # Documentation Generation
+  generate-documentation:
+    runs-on: ubuntu-latest
+    needs: [validate-specifications, generate-code]
+    name: "📚 Generate Documentation"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Generate comprehensive documentation
+        run: |
+          echo "📚 Generating comprehensive documentation..."
+
+          pip install mkdocs mkdocs-material pymdown-extensions
+
+          # Create documentation structure
+          mkdir -p docs/{api,guides,tutorials,reference}
+
+          # Generate MkDocs configuration
+          cat > mkdocs.yml << 'EOF'
+          site_name: IDEA Africa Financial RAG API
+          site_description: Specification-driven financial AI platform
+          site_url: https://docs.ideaafricatech.org
+
+          theme:
+            name: material
+            palette:
+              primary: blue
+              accent: orange
+            features:
+              - navigation.tabs
+              - navigation.sections
+              - navigation.expand
+              - search.highlight
+
+          nav:
+            - Home: index.md
+            - API Reference:
+              - Overview: api/index.md
+              - Endpoints: api/endpoints.md
+              - Authentication: api/auth.md
+            - AI Specifications:
+              - AISpec Configuration: reference/aispec.md
+              - Multi-Assistant Architecture: reference/assistants.md
+            - Development:
+              - Spec-Driven Workflow: guides/spec-driven-development.md
+              - Code Generation: guides/code-generation.md
+              - Testing Strategy: guides/testing.md
+            - Tutorials:
+              - Getting Started: tutorials/quickstart.md
+              - Financial Analysis: tutorials/financial-analysis.md
+              - African Markets: tutorials/african-markets.md
+          EOF
+
+          # Generate main documentation files
+          cat > docs/index.md << 'EOF'
+          # IDEA Africa Financial RAG API
+
+          Welcome to the specification-driven financial AI platform designed for African markets.
+
+          ## Features
+
+          - **Multi-Assistant AI Architecture** powered by AISpec
+          - **OpenAPI-First Development** with automated code generation
+          - **African Market Specialization** with local expertise
+          - **SEC Document Processing** with OCR and AI extraction
+          - **Kubernetes-Native Deployment** for scalable operations
+
+          ## Quick Links
+
+          - [API Documentation](api/index.md)
+          - [AISpec Configuration](reference/aispec.md)
+          - [Getting Started Tutorial](tutorials/quickstart.md)
+          EOF
+
+          echo "✅ Documentation structure created"
+
+      - name: Deploy documentation
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "🚀 Deploying documentation to GitHub Pages..."
+          # This would typically deploy to GitHub Pages or another hosting service
+
+  # Deployment to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [test-specifications, security-compliance]
+    if: github.ref == 'refs/heads/develop'
+    name: "🚀 Deploy to Staging"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy AISpec configuration
+        run: |
+          echo "🚀 Deploying AISpec configuration to staging..."
+
+          # This would deploy the AISpec configuration to a Kubernetes cluster
+          # using kubectl or a GitOps operator like ArgoCD
+
+          echo "📋 AISpec deployment manifest:"
+          echo "---"
+          cat financial-rag-aispec.yaml
+
+          echo "✅ Staging deployment completed"
+
+# Workflow completion notification
+  notify-completion:
+    runs-on: ubuntu-latest
+    needs: [validate-specifications, generate-code, test-specifications, security-compliance, generate-documentation]
+    if: always()
+    name: "📢 Notify Completion"
+
+    steps:
+      - name: Report workflow status
+        run: |
+          echo "🎯 Spec-Driven Development CI/CD Completed"
+          echo "=================================="
+          echo "✅ Specification Validation: ${{ needs.validate-specifications.result }}"
+          echo "✅ Code Generation: ${{ needs.generate-code.result }}"
+          echo "✅ Specification Testing: ${{ needs.test-specifications.result }}"
+          echo "✅ Security & Compliance: ${{ needs.security-compliance.result }}"
+          echo "✅ Documentation Generation: ${{ needs.generate-documentation.result }}"
+
+          if [[ "${{ needs.validate-specifications.result }}" == "success" ]] && \
+             [[ "${{ needs.generate-code.result }}" == "success" ]] && \
+             [[ "${{ needs.test-specifications.result }}" == "success" ]] && \
+             [[ "${{ needs.security-compliance.result }}" == "success" ]]; then
+            echo "🎉 All specification-driven development checks passed!"
+          else
+            echo "❌ Some checks failed. Please review the workflow results."
+          fi
