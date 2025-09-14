@@ -1,0 +1,843 @@
+openapi: 3.0.3
+info:
+  title: IDEA Africa Financial RAG API
+  version: 1.0.0
+  description: |
+    Specification-driven financial analysis and document processing API for African markets.
+
+    This API provides AI-powered financial insights, SEC document processing, and RAG-based
+    query capabilities with specialized knowledge of African financial markets.
+  contact:
+    name: IDEA Africa FinTech Team
+    url: https://ideaafricatech.org
+    email: support@ideaafricatech.org
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.ideaafricatech.org/v1
+    description: Production server
+  - url: https://staging-api.ideaafricatech.org/v1
+    description: Staging server
+  - url: http://localhost:8000/api/v1
+    description: Development server
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    # Core Financial Domain Models
+    FinancialQuery:
+      type: object
+      required:
+        - query
+        - context
+      properties:
+        query:
+          type: string
+          description: Financial analysis question or request
+          example: "What are the key risk factors for AAPL in Q3 2024?"
+          minLength: 5
+          maxLength: 2000
+        context:
+          type: string
+          enum:
+            - sec-filing
+            - market-analysis
+            - risk-assessment
+            - compliance-review
+            - african-markets
+            - comparative-analysis
+          description: Context type for specialized analysis
+        filters:
+          $ref: '#/components/schemas/QueryFilters'
+        session_id:
+          type: string
+          format: uuid
+          description: Session identifier for conversation continuity
+        user_preferences:
+          $ref: '#/components/schemas/UserPreferences'
+
+    QueryFilters:
+      type: object
+      properties:
+        sector:
+          type: string
+          example: "Technology"
+          enum:
+            - Technology
+            - Financial Services
+            - Healthcare
+            - Energy
+            - Materials
+            - Consumer Goods
+            - Telecommunications
+            - Agriculture
+        timeframe:
+          type: string
+          example: "2024-Q3"
+          pattern: '^(20[0-9]{2}-(Q[1-4]|[0-1][0-9]))|(last-[1-9][0-9]?-years)$'
+        market_region:
+          type: string
+          enum:
+            - north-america
+            - europe
+            - africa
+            - asia-pacific
+            - south-america
+            - global
+        company_ticker:
+          type: string
+          pattern: '^[A-Z]{1,5}$'
+          example: "AAPL"
+        document_types:
+          type: array
+          items:
+            type: string
+            enum:
+              - 10-K
+              - 10-Q
+              - 8-K
+              - DEF-14A
+              - annual-report
+              - earnings-call
+        confidence_threshold:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          default: 0.7
+
+    UserPreferences:
+      type: object
+      properties:
+        language:
+          type: string
+          enum: [en, fr, pt, sw, am]
+          default: en
+        currency_display:
+          type: string
+          enum: [USD, EUR, ZAR, NGN, KES, EGP]
+          default: USD
+        analysis_depth:
+          type: string
+          enum: [summary, detailed, comprehensive]
+          default: detailed
+        include_charts:
+          type: boolean
+          default: true
+        african_market_focus:
+          type: boolean
+          default: false
+
+    FinancialInsight:
+      type: object
+      properties:
+        analysis:
+          type: string
+          description: AI-generated financial analysis with actionable insights
+        executive_summary:
+          type: string
+          description: Concise summary of key findings
+        key_metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinancialMetric'
+        risk_factors:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskFactor'
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentReference'
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Overall confidence in the analysis
+        compliance_notes:
+          type: array
+          items:
+            type: string
+          description: Regulatory compliance considerations
+        african_market_insights:
+          $ref: '#/components/schemas/AfricanMarketContext'
+        generated_at:
+          type: string
+          format: date-time
+        model_info:
+          $ref: '#/components/schemas/ModelInfo'
+
+    FinancialMetric:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Return on Equity"
+        value:
+          type: number
+          format: double
+        unit:
+          type: string
+          example: "%"
+        timeframe:
+          type: string
+          example: "Q3 2024"
+        trend:
+          type: string
+          enum: [increasing, decreasing, stable, volatile]
+        benchmark_comparison:
+          type: object
+          properties:
+            industry_average:
+              type: number
+            percentile_rank:
+              type: integer
+              minimum: 1
+              maximum: 100
+
+    RiskFactor:
+      type: object
+      properties:
+        category:
+          type: string
+          enum:
+            - market-risk
+            - credit-risk
+            - operational-risk
+            - regulatory-risk
+            - political-risk
+            - currency-risk
+            - liquidity-risk
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        description:
+          type: string
+        probability:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+        impact_assessment:
+          type: string
+        mitigation_strategies:
+          type: array
+          items:
+            type: string
+
+    DocumentReference:
+      type: object
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        document_type:
+          type: string
+          enum: [10-K, 10-Q, 8-K, DEF-14A, annual-report, earnings-call, research-report]
+        company_ticker:
+          type: string
+        filing_date:
+          type: string
+          format: date
+        relevance_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+        excerpt:
+          type: string
+          maxLength: 500
+        page_numbers:
+          type: array
+          items:
+            type: integer
+        url:
+          type: string
+          format: uri
+
+    AfricanMarketContext:
+      type: object
+      properties:
+        regional_economic_indicators:
+          type: object
+          additionalProperties:
+            type: number
+        currency_exchange_rates:
+          type: object
+          additionalProperties:
+            type: number
+        political_stability_index:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 10.0
+        market_accessibility:
+          type: string
+          enum: [accessible, semi-accessible, restricted]
+        local_regulations:
+          type: array
+          items:
+            type: string
+        investment_climate:
+          type: string
+          enum: [favorable, neutral, challenging]
+
+    ModelInfo:
+      type: object
+      properties:
+        model_name:
+          type: string
+          example: "financial-llm-7b"
+        model_version:
+          type: string
+          example: "2024.1"
+        provider:
+          type: string
+          enum: [vllm, ollama, helix]
+        inference_time_ms:
+          type: integer
+          minimum: 0
+        token_usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            completion_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    # Document Processing Models
+    DocumentUpload:
+      type: object
+      required:
+        - file_name
+        - document_type
+      properties:
+        file_name:
+          type: string
+          example: "apple_10k_2024.pdf"
+        document_type:
+          type: string
+          enum: [10-K, 10-Q, 8-K, DEF-14A, annual-report, earnings-call]
+        company_ticker:
+          type: string
+          pattern: '^[A-Z]{1,5}$'
+          example: "AAPL"
+        filing_date:
+          type: string
+          format: date
+        tags:
+          type: array
+          items:
+            type: string
+        processing_options:
+          $ref: '#/components/schemas/DocumentProcessingOptions'
+
+    DocumentProcessingOptions:
+      type: object
+      properties:
+        extract_tables:
+          type: boolean
+          default: true
+        extract_images:
+          type: boolean
+          default: false
+        ocr_language:
+          type: string
+          enum: [eng, fra, por]
+          default: eng
+        chunk_strategy:
+          type: string
+          enum: [paragraph, section, page, semantic]
+          default: semantic
+        enable_summarization:
+          type: boolean
+          default: true
+        extract_financial_metrics:
+          type: boolean
+          default: true
+
+    DocumentProcessingResult:
+      type: object
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        processing_status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        extracted_text:
+          type: string
+        structured_data:
+          type: object
+          description: Extracted financial metrics and structured information
+        chunks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentChunk'
+        summary:
+          type: string
+        processing_time_seconds:
+          type: number
+          format: float
+        error_messages:
+          type: array
+          items:
+            type: string
+
+    DocumentChunk:
+      type: object
+      properties:
+        chunk_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        chunk_type:
+          type: string
+          enum: [text, table, financial_statement, footnote]
+        page_number:
+          type: integer
+          minimum: 1
+        embedding_vector:
+          type: array
+          items:
+            type: number
+          description: Vector embedding for semantic search
+        metadata:
+          type: object
+          additionalProperties: true
+
+    # Chat and Session Management
+    ChatMessage:
+      type: object
+      required:
+        - content
+        - role
+      properties:
+        content:
+          type: string
+          maxLength: 8000
+        role:
+          type: string
+          enum: [user, assistant, system]
+        timestamp:
+          type: string
+          format: date-time
+        context:
+          type: object
+          description: Additional context for the message
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageAttachment'
+
+    MessageAttachment:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [document, chart, table]
+        content:
+          type: string
+        metadata:
+          type: object
+
+    ChatSession:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        context:
+          type: object
+          description: Session-wide context and preferences
+        metadata:
+          type: object
+
+    # Error Handling
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type identifier
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+        trace_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+
+    ValidationError:
+      type: object
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+
+paths:
+  # Financial Analysis Endpoints
+  /financial/analyze:
+    post:
+      operationId: analyzeFinancialQuery
+      summary: Generate financial analysis with RAG
+      description: |
+        Process a financial query using Retrieval-Augmented Generation with specialized
+        financial models and African market knowledge.
+      tags:
+        - Financial Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialQuery'
+            examples:
+              market_analysis:
+                summary: African market analysis example
+                value:
+                  query: "Compare the growth potential of fintech companies in Kenya vs Nigeria"
+                  context: "african-markets"
+                  filters:
+                    sector: "Financial Services"
+                    market_region: "africa"
+                  user_preferences:
+                    african_market_focus: true
+                    currency_display: "USD"
+              risk_assessment:
+                summary: Risk assessment example
+                value:
+                  query: "What are the main regulatory risks for US tech companies operating in Africa?"
+                  context: "risk-assessment"
+                  filters:
+                    sector: "Technology"
+                    market_region: "africa"
+      responses:
+        '200':
+          description: Successful financial analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialInsight'
+              examples:
+                african_fintech_analysis:
+                  summary: African fintech market analysis result
+                  value:
+                    analysis: "Based on current market data and regulatory frameworks..."
+                    executive_summary: "Kenyan fintech shows higher regulatory clarity..."
+                    confidence: 0.87
+                    african_market_insights:
+                      political_stability_index: 7.2
+                      investment_climate: "favorable"
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          description: Rate limit exceeded
+        '500':
+          description: Internal server error
+
+  # Document Processing Endpoints
+  /documents/upload:
+    post:
+      operationId: uploadDocument
+      summary: Upload and process financial document
+      description: |
+        Upload a financial document (PDF, Word, Excel) for processing, OCR extraction,
+        and integration into the RAG knowledge base.
+      tags:
+        - Document Processing
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - metadata
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file (PDF, DOCX, XLSX)
+                metadata:
+                  $ref: '#/components/schemas/DocumentUpload'
+      responses:
+        '202':
+          description: Document accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [queued]
+                  estimated_processing_time:
+                    type: integer
+                    description: Estimated processing time in seconds
+        '400':
+          description: Invalid document or metadata
+        '413':
+          description: Document too large
+
+  /documents/{document_id}/status:
+    get:
+      operationId: getDocumentProcessingStatus
+      summary: Get document processing status
+      tags:
+        - Document Processing
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Processing status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentProcessingResult'
+
+  # Chat Interface Endpoints
+  /chat/sessions:
+    post:
+      operationId: createChatSession
+      summary: Create new chat session
+      tags:
+        - Chat Interface
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                initial_context:
+                  type: object
+                user_preferences:
+                  $ref: '#/components/schemas/UserPreferences'
+      responses:
+        '201':
+          description: Chat session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSession'
+
+  /chat/sessions/{session_id}/messages:
+    post:
+      operationId: sendChatMessage
+      summary: Send message in chat session
+      tags:
+        - Chat Interface
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessage'
+      responses:
+        '200':
+          description: Message processed and response generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+
+    get:
+      operationId: getChatHistory
+      summary: Retrieve chat session history
+      tags:
+        - Chat Interface
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Chat history retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatMessage'
+                  total_count:
+                    type: integer
+                  has_more:
+                    type: boolean
+
+  # Knowledge Base Search
+  /knowledge/search:
+    post:
+      operationId: searchKnowledgeBase
+      summary: Search financial knowledge base
+      description: |
+        Perform semantic and keyword search across processed financial documents
+        with vector similarity and full-text search capabilities.
+      tags:
+        - Knowledge Base
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  minLength: 3
+                  maxLength: 500
+                search_type:
+                  type: string
+                  enum: [semantic, keyword, hybrid]
+                  default: hybrid
+                filters:
+                  $ref: '#/components/schemas/QueryFilters'
+                limit:
+                  type: integer
+                  default: 10
+                  maximum: 50
+      responses:
+        '200':
+          description: Search results retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentReference'
+                  total_count:
+                    type: integer
+                  search_time_ms:
+                    type: integer
+
+  # Health and Monitoring
+  /health:
+    get:
+      operationId: getHealthStatus
+      summary: Get API health status
+      description: Health check endpoint for monitoring and load balancing
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded]
+                  version:
+                    type: string
+                  uptime_seconds:
+                    type: integer
+                  dependencies:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [healthy, unhealthy]
+                      vector_db:
+                        type: string
+                        enum: [healthy, unhealthy]
+                      ai_models:
+                        type: string
+                        enum: [healthy, unhealthy]
+
+tags:
+  - name: Financial Analysis
+    description: AI-powered financial analysis and insights
+  - name: Document Processing
+    description: SEC document upload, OCR, and processing
+  - name: Chat Interface
+    description: Conversational financial AI assistant
+  - name: Knowledge Base
+    description: Search and retrieval from financial documents
+  - name: Monitoring
+    description: Health checks and system monitoring
