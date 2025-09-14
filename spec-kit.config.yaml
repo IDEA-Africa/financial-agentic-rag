@@ -1,0 +1,376 @@
+# GitHub Spec-Kit Configuration for Financial RAG Application
+# This configuration enables spec-driven development with AI-assisted coding
+
+project:
+  name: "idea-africa-financial-rag"
+  description: "Spec-driven financial RAG application for African markets"
+  version: "1.0.0"
+  type: "financial-ai-platform"
+
+# Specification-driven development configuration
+specifications:
+  # OpenAPI Specification
+  openapi:
+    path: "api/v1/financial-rag-spec.yaml"
+    version: "3.0.3"
+    generate_code: true
+    validate_on_commit: true
+    auto_update_docs: true
+
+  # AISpec Configuration
+  aispec:
+    path: "financial-rag-aispec.yaml"
+    version: "v1alpha1"
+    multi_assistant: true
+    kubernetes_native: true
+    validate_ai_models: true
+
+# Development phases configuration
+phases:
+  # Phase 1: Specify requirements and architecture
+  specify:
+    enabled: true
+    templates:
+      - "financial-services"
+      - "ai-ml-platform"
+      - "kubernetes-native"
+    output_format: "markdown"
+    include_compliance: true
+    african_market_focus: true
+
+  # Phase 2: Technical planning with AI assistance
+  plan:
+    enabled: true
+    ai_assistance: true
+    technology_stack:
+      backend:
+        - "fastapi"
+        - "pydantic"
+        - "postgresql"
+        - "milvus"
+      frontend:
+        - "react"
+        - "typescript"
+        - "tailwindcss"
+      ai_ml:
+        - "vllm"
+        - "ollama"
+        - "transformers"
+        - "open-dataHub"
+      infrastructure:
+        - "kubernetes"
+        - "prometheus"
+        - "grafana"
+        - "cert-manager"
+
+    # AI model preferences for planning
+    planning_model:
+      provider: "claude"
+      model: "claude-3-sonnet"
+      temperature: 0.1
+      max_tokens: 4000
+
+  # Phase 3: Implementation with code generation
+  implement:
+    enabled: true
+    code_generation:
+      backend:
+        enabled: true
+        framework: "fastapi"
+        models_from_openapi: true
+        generate_stubs: true
+        include_tests: true
+
+      frontend:
+        enabled: true
+        framework: "react-typescript"
+        client_from_openapi: true
+        component_generation: true
+
+      infrastructure:
+        enabled: true
+        kubernetes_manifests: true
+        helm_charts: true
+        aispec_crds: true
+
+    # Testing configuration
+    testing:
+      unit_tests: true
+      integration_tests: true
+      api_contract_tests: true
+      ai_model_evaluation: true
+      performance_tests: true
+
+  # Phase 4: Refinement and optimization
+  refine:
+    enabled: true
+    continuous_improvement: true
+    performance_monitoring: true
+    ai_feedback_loops: true
+    specification_evolution: true
+
+# AI-assisted development configuration
+ai_assistance:
+  # Primary AI model for development tasks
+  primary_model:
+    provider: "claude"
+    model: "claude-3-sonnet"
+    api_key_env: "CLAUDE_API_KEY"
+    temperature: 0.1
+    max_tokens: 8000
+
+  # Specialized AI models for different tasks
+  specialized_models:
+    code_generation:
+      provider: "claude"
+      model: "claude-3-sonnet"
+      temperature: 0.0
+      focus: "precise code generation"
+
+    documentation:
+      provider: "claude"
+      model: "claude-3-haiku"
+      temperature: 0.2
+      focus: "clear technical documentation"
+
+    testing:
+      provider: "claude"
+      model: "claude-3-sonnet"
+      temperature: 0.0
+      focus: "comprehensive test coverage"
+
+  # AI prompting strategies
+  prompts:
+    specification_generation:
+      system: |
+        You are an expert in financial systems and API specification design.
+        Focus on creating comprehensive, compliant, and secure APIs for financial services.
+        Consider African market requirements, regulatory compliance, and scalability.
+
+    code_generation:
+      system: |
+        You are a senior software engineer specializing in spec-driven development.
+        Generate clean, maintainable code that strictly follows the provided specifications.
+        Ensure financial domain best practices and security considerations.
+
+    documentation:
+      system: |
+        You are a technical writer specializing in financial AI platforms.
+        Create clear, comprehensive documentation that helps developers understand
+        and implement specification-driven development workflows.
+
+# Financial domain-specific configuration
+financial_domain:
+  # Compliance requirements
+  compliance:
+    sec_regulations: true
+    african_market_rules: true
+    data_protection: ["GDPR", "POPIA"]
+    financial_disclaimers: true
+
+  # Market coverage
+  markets:
+    primary:
+      - "south_africa"
+      - "nigeria"
+      - "kenya"
+      - "egypt"
+    secondary:
+      - "ghana"
+      - "morocco"
+      - "ethiopia"
+      - "uganda"
+
+  # Data sources
+  data_sources:
+    - name: "SEC EDGAR"
+      type: "regulatory_filings"
+      api_endpoint: "https://data.sec.gov/api"
+
+    - name: "African Stock Exchanges"
+      type: "market_data"
+      endpoints:
+        JSE: "https://api.jse.co.za"
+        NSE: "https://api.nse.co.ke"
+        NGX: "https://api.ngxgroup.com"
+
+# Code generation templates and patterns
+code_generation:
+  # Backend patterns
+  backend_patterns:
+    - pattern: "repository_pattern"
+      description: "Data access abstraction with async/await"
+
+    - pattern: "service_layer"
+      description: "Business logic separation with dependency injection"
+
+    - pattern: "aispec_integration"
+      description: "AISpec-compliant assistant integration"
+
+  # Frontend patterns
+  frontend_patterns:
+    - pattern: "spec_driven_components"
+      description: "React components generated from OpenAPI specs"
+
+    - pattern: "type_safe_api_client"
+      description: "Fully typed API client with error handling"
+
+    - pattern: "idea_africa_design_system"
+      description: "Brand-consistent UI components"
+
+  # Infrastructure patterns
+  infrastructure_patterns:
+    - pattern: "kubernetes_native"
+      description: "Cloud-native deployment with K8s primitives"
+
+    - pattern: "aispec_crds"
+      description: "Custom Resource Definitions for AI assistants"
+
+    - pattern: "observability_stack"
+      description: "Prometheus, Grafana, and OpenTelemetry integration"
+
+# Workflow automation
+automation:
+  # Continuous Integration
+  ci:
+    specification_validation: true
+    code_generation: true
+    automated_testing: true
+    security_scanning: true
+    compliance_checking: true
+
+  # Continuous Deployment
+  cd:
+    staging_deployment: true
+    production_deployment: false  # Manual approval required
+    aispec_deployment: true
+    documentation_publishing: true
+
+  # Quality gates
+  quality_gates:
+    specification_coverage: 95
+    test_coverage: 80
+    security_score: 85
+    performance_benchmarks: true
+
+# Development environment configuration
+development:
+  # Local development setup
+  local_setup:
+    docker_compose: true
+    kubernetes_dev: true
+    hot_reload: true
+    debug_mode: true
+
+  # Development dependencies
+  dependencies:
+    required:
+      - "docker"
+      - "kubernetes"
+      - "python>=3.11"
+      - "node>=18"
+
+    optional:
+      - "k3s"  # Lightweight Kubernetes
+      - "tilt"  # Development environment automation
+      - "skaffold"  # Kubernetes development workflow
+
+  # IDE integration
+  ide_integration:
+    vscode_extensions:
+      - "ms-python.python"
+      - "bradlc.vscode-tailwindcss"
+      - "ms-kubernetes-tools.vscode-kubernetes-tools"
+      - "42Crunch.vscode-openapi"
+
+    code_templates: true
+    spec_validation: true
+    auto_completion: true
+
+# Monitoring and observability
+observability:
+  # Specification compliance monitoring
+  spec_compliance:
+    endpoint_coverage: true
+    response_validation: true
+    performance_tracking: true
+
+  # AI assistant monitoring
+  ai_monitoring:
+    model_performance: true
+    response_quality: true
+    token_usage: true
+    error_rates: true
+
+  # Business metrics
+  business_metrics:
+    user_engagement: true
+    financial_query_accuracy: true
+    document_processing_success: true
+    african_market_coverage: true
+
+# Documentation configuration
+documentation:
+  # Auto-generated documentation
+  auto_generation:
+    api_docs: true
+    ai_assistant_docs: true
+    deployment_guides: true
+    user_manuals: true
+
+  # Documentation themes
+  themes:
+    api_docs: "redoc"
+    user_docs: "mkdocs-material"
+    internal_docs: "notion"
+
+  # Content strategy
+  content:
+    target_audience: ["developers", "financial_analysts", "devops"]
+    languages: ["english", "french", "portuguese"]
+    formats: ["web", "pdf", "interactive"]
+
+# Security and compliance
+security:
+  # Specification security
+  spec_security:
+    authentication_required: true
+    authorization_patterns: true
+    data_encryption: true
+    audit_logging: true
+
+  # AI model security
+  ai_security:
+    model_isolation: true
+    prompt_injection_prevention: true
+    output_filtering: true
+    bias_detection: true
+
+  # Infrastructure security
+  infra_security:
+    network_policies: true
+    pod_security_standards: true
+    secret_management: true
+    vulnerability_scanning: true
+
+# Performance optimization
+performance:
+  # Specification-driven optimizations
+  spec_optimizations:
+    response_caching: true
+    query_optimization: true
+    bulk_operations: true
+
+  # AI model optimizations
+  ai_optimizations:
+    model_quantization: true
+    batch_inference: true
+    caching_strategies: true
+    load_balancing: true
+
+  # Infrastructure optimizations
+  infra_optimizations:
+    auto_scaling: true
+    resource_limits: true
+    performance_monitoring: true
+    cost_optimization: true
