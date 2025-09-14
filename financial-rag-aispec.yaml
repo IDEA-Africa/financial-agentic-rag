@@ -1,0 +1,509 @@
+apiVersion: aispec.org/v1alpha1
+kind: Application
+metadata:
+  name: idea-africa-financial-rag
+  version: "1.0.0"
+  description: "African-focused financial RAG application with multi-assistant AI architecture"
+  labels:
+    domain: "financial-services"
+    region: "africa"
+    compliance: "sec-compliant"
+
+spec:
+  # Multi-Assistant Architecture for Financial Domain
+  assistants:
+    # Primary Financial Analyst Assistant
+    - name: financial-analyst
+      version: "1.0.0"
+      description: "Senior financial analyst specializing in African markets and SEC filings"
+      model:
+        provider: "vllm"
+        name: "financial-llm-7b"
+        version: "2024.1"
+        parameters:
+          temperature: 0.1
+          max_tokens: 2048
+          top_p: 0.9
+          frequency_penalty: 0.1
+          presence_penalty: 0.1
+
+      systemPrompt: |
+        You are a senior financial analyst with deep expertise in African financial markets,
+        SEC filings analysis, and regulatory compliance. Your responsibilities include:
+
+        1. **Market Analysis**: Provide insights on African equity and bond markets,
+           including political, economic, and regulatory factors.
+
+        2. **SEC Document Analysis**: Extract key financial metrics, risk factors,
+           and compliance information from 10-K, 10-Q, 8-K, and other regulatory filings.
+
+        3. **Risk Assessment**: Evaluate political risk, currency risk, liquidity risk,
+           and market volatility specific to emerging African markets.
+
+        4. **Compliance**: Ensure all responses adhere to financial regulations and
+           include appropriate disclaimers for investment-related information.
+
+        5. **Cultural Context**: Incorporate understanding of local business practices,
+           economic conditions, and regulatory environments across African countries.
+
+        Always provide:
+        - Data-driven insights with confidence levels
+        - Source citations from processed documents
+        - Risk disclaimers for investment advice
+        - Local currency conversions when relevant
+        - Regional economic context for African markets
+
+      knowledge:
+        - type: vector_db
+          name: "milvus-financial-db"
+          source: "milvus://milvus-cluster:19530"
+          index: "sec-documents-index"
+          collection: "financial_documents"
+          embedding_model: "text-embedding-3-large"
+          search_params:
+            metric_type: "COSINE"
+            top_k: 10
+            confidence_threshold: 0.7
+
+        - type: vector_db
+          name: "african-markets-db"
+          source: "milvus://milvus-cluster:19530"
+          index: "african-markets-index"
+          collection: "african_market_data"
+          embedding_model: "text-embedding-3-large"
+
+        - type: documents
+          name: "financial-documents"
+          source: "s3://minio/financial-docs"
+          access_key_ref: "minio-access-key"
+          secret_key_ref: "minio-secret-key"
+          bucket: "financial-documents"
+
+        - type: structured_data
+          name: "market-data"
+          source: "postgresql://financial-rag-db:5432/market_data"
+          connection_string_ref: "postgres-connection-string"
+          tables:
+            - "african_stock_prices"
+            - "currency_rates"
+            - "economic_indicators"
+
+      integrations:
+        - type: api
+          name: "sec-edgar"
+          endpoint: "https://data.sec.gov/api/xbrl/companyfacts"
+          authentication:
+            type: "header"
+            header_name: "User-Agent"
+            value_ref: "sec-user-agent"
+          rate_limiting:
+            requests_per_second: 10
+
+        - type: api
+          name: "african-exchanges"
+          endpoint: "https://api.africanmarkets.com"
+          authentication:
+            type: "bearer_token"
+            token_ref: "african-markets-token"
+
+        - type: database
+          name: "financial-db"
+          connection: "postgresql://financial-rag-db:5432/financial_data"
+          connection_string_ref: "postgres-connection-string"
+
+        - type: cache
+          name: "analysis-cache"
+          provider: "redis"
+          connection: "redis://redis-cluster:6379/0"
+          ttl: 3600
+
+    # Document Processing Specialist
+    - name: document-processor
+      version: "1.0.0"
+      description: "Specialized in financial document OCR, extraction, and structuring"
+      model:
+        provider: "ollama"
+        name: "llama3.1-8b"
+        version: "latest"
+        parameters:
+          temperature: 0.0
+          max_tokens: 4096
+          top_k: 40
+          top_p: 0.8
+
+      systemPrompt: |
+        You are a document processing specialist focused on financial documents.
+        Your expertise includes:
+
+        1. **Text Extraction**: Clean and structure text from OCR-processed documents
+        2. **Financial Data Parsing**: Extract numerical data, tables, and metrics
+        3. **Document Classification**: Identify document types (10-K, 10-Q, 8-K, etc.)
+        4. **Quality Assurance**: Validate extracted data for accuracy and completeness
+        5. **Metadata Generation**: Create comprehensive document metadata and tags
+
+        Processing Standards:
+        - Maintain numerical precision for financial data
+        - Preserve table structures and relationships
+        - Generate confidence scores for extracted information
+        - Flag inconsistencies or potential errors
+        - Create standardized JSON outputs for downstream processing
+
+      integrations:
+        - type: ocr
+          name: "tesseract"
+          engine: "tesseract-5.0"
+          languages: ["eng", "fra", "por"]
+          config:
+            psm: 6
+            oem: 3
+
+        - type: nlp
+          name: "unstructured-io"
+          endpoint: "http://unstructured-api:8000"
+          features:
+            - table_extraction
+            - image_extraction
+            - metadata_extraction
+
+        - type: storage
+          name: "processed-docs"
+          provider: "minio"
+          bucket: "processed-documents"
+
+        - type: queue
+          name: "document-processing"
+          provider: "rabbitmq"
+          queue: "doc-processing-queue"
+
+    # African Markets Specialist
+    - name: african-markets-expert
+      version: "1.0.0"
+      description: "Expert in African financial markets, regulations, and investment climate"
+      model:
+        provider: "vllm"
+        name: "financial-llm-african-7b"
+        version: "2024.1"
+        parameters:
+          temperature: 0.2
+          max_tokens: 2048
+          top_p: 0.95
+
+      systemPrompt: |
+        You are an African financial markets expert with comprehensive knowledge of:
+
+        1. **Market Coverage**: 54 African countries' financial systems, major exchanges
+           (JSE, NSE, NGX, EGX, etc.), and regulatory frameworks
+
+        2. **Economic Analysis**: Regional economic integration, AFCFTA impact,
+           commodity markets, and infrastructure development
+
+        3. **Investment Climate**: Foreign direct investment trends, regulatory changes,
+           political risk assessment, and market accessibility
+
+        4. **Currency Dynamics**: African currency stability, exchange rate trends,
+           and impact on cross-border investments
+
+        5. **Sector Expertise**: Banking, telecommunications, agriculture, mining,
+           renewable energy, and fintech across African markets
+
+        Regional Specializations:
+        - West Africa: Nigeria, Ghana, Senegal, Côte d'Ivoire
+        - East Africa: Kenya, Ethiopia, Tanzania, Uganda
+        - North Africa: Egypt, Morocco, Tunisia, Algeria
+        - Southern Africa: South Africa, Botswana, Namibia, Zambia
+        - Central Africa: Cameroon, Gabon, Chad, Central African Republic
+
+        Always provide context on regulatory environment, market maturity,
+        and investment considerations specific to African markets.
+
+      knowledge:
+        - type: structured_data
+          name: "african-economic-data"
+          source: "postgresql://african-data-db:5432"
+          tables:
+            - "country_profiles"
+            - "exchange_rates_history"
+            - "stock_market_indices"
+            - "regulatory_frameworks"
+
+        - type: api
+          name: "african-development-bank"
+          endpoint: "https://api.afdb.org/data"
+
+        - type: documents
+          name: "african-reports"
+          source: "s3://minio/african-market-reports"
+
+    # Risk Assessment Specialist
+    - name: risk-assessor
+      version: "1.0.0"
+      description: "Comprehensive risk analysis for emerging market investments"
+      model:
+        provider: "vllm"
+        name: "risk-analysis-llm-7b"
+        version: "2024.1"
+        parameters:
+          temperature: 0.05
+          max_tokens: 1500
+
+      systemPrompt: |
+        You are a risk assessment specialist focusing on emerging markets,
+        particularly African financial markets. Your analysis covers:
+
+        1. **Political Risk**: Government stability, policy changes, regulatory shifts
+        2. **Economic Risk**: Inflation, currency devaluation, fiscal policy
+        3. **Market Risk**: Liquidity, volatility, market depth
+        4. **Operational Risk**: Infrastructure, legal systems, business environment
+        5. **ESG Risk**: Environmental, social, and governance factors
+
+        Risk Assessment Framework:
+        - Quantitative models with probability distributions
+        - Qualitative assessments with confidence intervals
+        - Scenario analysis (best case, base case, worst case)
+        - Mitigation strategy recommendations
+        - Early warning indicators and monitoring metrics
+
+        Always provide numerical risk scores (0-10 scale) with detailed justifications.
+
+      integrations:
+        - type: api
+          name: "world-bank-indicators"
+          endpoint: "https://api.worldbank.org/v2"
+
+        - type: api
+          name: "political-risk-services"
+          endpoint: "https://api.prs.com"
+          authentication:
+            type: "api_key"
+            key_ref: "prs-api-key"
+
+  # UI and Interface Configuration
+  interfaces:
+    # Web Chat Interface
+    - type: chat
+      name: "financial-chat-ui"
+      description: "Web-based chat interface for financial analysis"
+      configuration:
+        theme: "idea-africa"
+        primary_color: "#336699"
+        secondary_color: "#006666"
+        accent_color: "#FF6633"
+        layout: "sidebar"
+        features:
+          - voice_input: true
+          - file_upload: true
+          - chart_generation: true
+          - export_analysis: true
+        default_assistant: "financial-analyst"
+
+    # API Interface
+    - type: openapi
+      name: "financial-rag-api"
+      specification_path: "./api/v1/financial-rag-spec.yaml"
+      authentication:
+        - jwt_bearer
+        - api_key
+      rate_limiting:
+        requests_per_minute: 100
+        burst_size: 20
+
+    # Embedded Widget
+    - type: widget
+      name: "financial-analysis-widget"
+      description: "Embeddable financial analysis widget"
+      configuration:
+        width: "400px"
+        height: "600px"
+        resizable: true
+        theme: "compact"
+
+  # Testing and Validation
+  testing:
+    - type: unit_tests
+      framework: "pytest"
+      coverage_threshold: 85
+      test_files:
+        - "tests/test_financial_analysis.py"
+        - "tests/test_document_processing.py"
+        - "tests/test_african_markets.py"
+
+    - type: integration_tests
+      framework: "pytest"
+      environment: "staging"
+      test_scenarios:
+        - "end_to_end_document_processing"
+        - "multi_assistant_collaboration"
+        - "api_rate_limiting"
+
+    - type: performance_tests
+      tool: "locust"
+      target_rps: 50
+      duration: "300s"
+      scenarios:
+        - "financial_query_load_test"
+        - "document_upload_stress_test"
+
+    - type: ai_evaluation
+      metrics:
+        - accuracy: 0.90
+        - relevance: 0.85
+        - compliance: 1.00
+        - response_time: 2000  # milliseconds
+      evaluation_dataset: "financial_qa_benchmark_v1"
+
+  # Deployment Configuration
+  deployment:
+    # Kubernetes Deployment
+    - type: kubernetes
+      namespace: "idea-africa-fintech"
+      replicas: 3
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "500m"
+        limits:
+          memory: "4Gi"
+          cpu: "2"
+
+      # AI Model Serving Configuration
+      model_serving:
+        - assistant: "financial-analyst"
+          deployment:
+            replicas: 2
+            resources:
+              limits:
+                nvidia.com/gpu: 1
+                memory: "8Gi"
+
+        - assistant: "document-processor"
+          deployment:
+            replicas: 1
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+
+      # Service Configuration
+      services:
+        - name: "financial-rag-api"
+          type: "ClusterIP"
+          ports:
+            - port: 8000
+              targetPort: 8000
+
+        - name: "chat-ui"
+          type: "ClusterIP"
+          ports:
+            - port: 3000
+              targetPort: 3000
+
+      # Ingress Configuration
+      ingress:
+        enabled: true
+        className: "contour"
+        annotations:
+          cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        hosts:
+          - host: "financial-ai.ideaafricatech.org"
+            paths:
+              - path: "/api"
+                pathType: "Prefix"
+                service: "financial-rag-api"
+              - path: "/"
+                pathType: "Prefix"
+                service: "chat-ui"
+        tls:
+          - secretName: "financial-ai-tls"
+            hosts:
+              - "financial-ai.ideaafricatech.org"
+
+  # Monitoring and Observability
+  observability:
+    metrics:
+      provider: "prometheus"
+      namespace: "monitoring"
+      custom_metrics:
+        - name: "financial_query_accuracy"
+          type: "histogram"
+        - name: "document_processing_duration"
+          type: "histogram"
+        - name: "african_market_api_calls"
+          type: "counter"
+
+    logging:
+      provider: "fluentd"
+      destination: "elasticsearch://elastic:9200"
+      log_level: "INFO"
+      structured_logging: true
+
+    tracing:
+      provider: "jaeger"
+      sampling_rate: 0.1
+      trace_ai_interactions: true
+
+  # Security Configuration
+  security:
+    authentication:
+      providers:
+        - type: "jwt"
+          issuer: "https://auth.ideaafricatech.org"
+          audience: "financial-rag-api"
+        - type: "api_key"
+          header: "X-API-Key"
+
+    authorization:
+      rbac:
+        enabled: true
+        roles:
+          - name: "financial_analyst"
+            permissions:
+              - "query:financial_data"
+              - "access:african_markets"
+          - name: "document_uploader"
+            permissions:
+              - "upload:documents"
+              - "view:processing_status"
+
+    data_protection:
+      encryption_at_rest: true
+      encryption_in_transit: true
+      pii_detection: true
+      data_retention_days: 365
+
+  # Configuration Management
+  configuration:
+    config_maps:
+      - name: "financial-models-config"
+        data:
+          model_endpoints: |
+            vllm_endpoint: "http://vllm-service:8000"
+            ollama_endpoint: "http://ollama-service:11434"
+          market_data_sources: |
+            sec_edgar_api: "https://data.sec.gov/api"
+            african_exchanges_api: "https://api.africanmarkets.com"
+
+    secrets:
+      - name: "database-credentials"
+        keys:
+          - postgres_username
+          - postgres_password
+          - postgres_connection_string
+      - name: "api-keys"
+        keys:
+          - sec_api_key
+          - african_markets_token
+          - openai_api_key
+
+# AISpec Metadata
+metadata:
+  aispec_version: "v1alpha1"
+  created_by: "IDEA Africa FinTech Team"
+  created_at: "2024-09-14T17:00:00Z"
+  documentation_url: "https://docs.ideaafricatech.org/financial-rag"
+  support_contact: "support@ideaafricatech.org"
+  license: "MIT"
+  compliance:
+    - "SEC Regulation Fair Disclosure"
+    - "African Union Financial Market Regulations"
+    - "GDPR (for EU users)"
+    - "POPIA (South Africa)"
