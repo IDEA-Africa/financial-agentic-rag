@@ -43,6 +43,7 @@ from app.api.routes import (
     sec_documents,
     deployments,
     evaluation,
+    agents,
 )
 from app.services.azure_services import AzureServiceManager
 from app.core.observability import observability, setup_fastapi_instrumentation
@@ -200,6 +201,7 @@ application.include_router(
 )
 application.include_router(deployments.router, prefix="/api/v1", tags=["Deployments"])
 application.include_router(sec_documents.router, tags=["SEC Documents"])
+application.include_router(agents.router, tags=["Enhanced Agentic RAG"])
 
 
 @application.get("/")
