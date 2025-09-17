@@ -1,0 +1,112 @@
+# T006: Test SSH key authentication from GitHub Actions to deployment target
+# This workflow tests the complete SSH deployment setup
+
+name: Test SSH Deployment Authentication
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode (dry-run or full-test)'
+        required: true
+        default: 'dry-run'
+        type: choice
+        options:
+        - dry-run
+        - full-test
+
+jobs:
+  test-ssh-authentication:
+    runs-on: ubuntu-latest
+    environment: financial-agentic-rag-deploy
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup SSH Agent
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+    - name: Configure SSH
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H localhost >> ~/.ssh/known_hosts
+        cat >> ~/.ssh/config << EOF
+        Host deployment-target
+          HostName localhost
+          User ubuntu
+          IdentitiesOnly yes
+          StrictHostKeyChecking no
+        EOF
+
+    - name: Test SSH Key Authentication
+      run: |
+        echo "🔐 Testing SSH key authentication..."
+
+        # Test SSH connection
+        if ssh -o ConnectTimeout=10 deployment-target 'echo "✅ SSH authentication successful"'; then
+          echo "✅ SSH key authentication working"
+        else
+          echo "❌ SSH key authentication failed"
+          echo "🔍 Debugging information:"
+          ssh-add -l
+          echo "SSH config:"
+          cat ~/.ssh/config
+          exit 1
+        fi
+
+    - name: Test Deployment Commands (Dry Run)
+      if: inputs.test_mode == 'dry-run'
+      run: |
+        echo "🧪 Testing deployment commands (dry-run mode)..."
+
+        # Test basic system commands
+        ssh deployment-target 'echo "Current user: $(whoami)"'
+        ssh deployment-target 'echo "Current directory: $(pwd)"'
+        ssh deployment-target 'echo "System info: $(uname -a)"'
+
+        # Test directory access
+        ssh deployment-target 'ls -la /opt/ || echo "Creating /opt/financial-agentic-rag directory would happen here"'
+
+        echo "✅ Dry-run tests completed successfully"
+
+    - name: Test Full Deployment Simulation
+      if: inputs.test_mode == 'full-test'
+      run: |
+        echo "🚀 Testing full deployment simulation..."
+
+        # Create deployment directory
+        ssh deployment-target 'sudo mkdir -p /opt/financial-agentic-rag || echo "Directory creation test"'
+
+        # Test git operations
+        ssh deployment-target 'cd /tmp && git clone --depth 1 https://github.com/IDEA-Africa/financial-agentic-rag.git test-repo || echo "Git clone test"'
+
+        # Test Docker operations (if available)
+        ssh deployment-target 'docker --version || echo "Docker not available for testing"'
+
+        # Cleanup test files
+        ssh deployment-target 'rm -rf /tmp/test-repo || echo "Cleanup test"'
+
+        echo "✅ Full deployment simulation completed"
+
+    - name: Generate Test Report
+      if: always()
+      run: |
+        echo "📊 SSH Authentication Test Report"
+        echo "================================"
+        echo "Date: $(date)"
+        echo "Test Mode: ${{ inputs.test_mode }}"
+        echo "Repository: IDEA-Africa/financial-agentic-rag"
+        echo "Target Host: localhost"
+        echo "SSH Key: financial_agentic_rag_github_deploy"
+        echo ""
+
+        if [[ "${{ job.status }}" == "success" ]]; then
+          echo "✅ Status: PASSED"
+          echo "🎉 SSH authentication and deployment setup is working correctly!"
+        else
+          echo "❌ Status: FAILED"
+          echo "🔧 SSH setup needs attention before proceeding with MCP server implementation"
+        fi

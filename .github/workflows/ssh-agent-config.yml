@@ -1,0 +1,68 @@
+# T005: Configure SSH agent for GitHub Actions workflows
+# This workflow template demonstrates SSH agent configuration for deployment
+
+name: SSH Agent Configuration Template
+
+on:
+  workflow_call:
+    inputs:
+      deployment_target:
+        description: 'Deployment target host'
+        required: true
+        type: string
+        default: 'localhost'
+      deployment_user:
+        description: 'Deployment user'
+        required: true
+        type: string
+        default: 'ubuntu'
+    secrets:
+      DEPLOY_SSH_PRIVATE_KEY:
+        description: 'SSH private key for deployment'
+        required: true
+
+jobs:
+  configure-ssh:
+    runs-on: ubuntu-latest
+    environment: financial-agentic-rag-deploy
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup SSH Agent
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+    - name: Add SSH known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ inputs.deployment_target }} >> ~/.ssh/known_hosts
+        echo "✅ SSH known hosts configured"
+
+    - name: Test SSH connection
+      run: |
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ inputs.deployment_user }}@${{ inputs.deployment_target }} 'echo "✅ SSH connection successful"'
+
+    - name: Setup SSH configuration
+      run: |
+        cat >> ~/.ssh/config << EOF
+        Host deployment-target
+          HostName ${{ inputs.deployment_target }}
+          User ${{ inputs.deployment_user }}
+          IdentitiesOnly yes
+          StrictHostKeyChecking no
+          UserKnownHostsFile ~/.ssh/known_hosts
+        EOF
+        echo "✅ SSH config created"
+
+    - name: Verify SSH setup
+      run: |
+        echo "🔍 SSH Agent status:"
+        ssh-add -l
+        echo ""
+        echo "🔍 SSH config:"
+        cat ~/.ssh/config
+        echo ""
+        echo "✅ SSH agent configuration complete"
