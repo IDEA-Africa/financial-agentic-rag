@@ -111,8 +111,9 @@ git add .github/workflows/ scripts/github/
 if git diff --cached --quiet; then
     print_success "✅ No new setup files or changes to commit."
 else
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     git commit -m "feat: add GitHub Actions setup scripts and workflows (T002-T006)"
-    if git push; then
+    if git push --set-upstream origin "$CURRENT_BRANCH"; then
         print_success "✅ Setup files and workflows pushed to remote repository."
     else
         print_error "Failed to push setup files. Please push them manually."

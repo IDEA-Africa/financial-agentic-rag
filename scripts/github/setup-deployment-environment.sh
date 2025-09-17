@@ -31,7 +31,7 @@ echo "📋 Environment creation requires GitHub API calls..."
 
 # Create the environment using GitHub REST API
 echo "🚀 Creating environment '$ENV_NAME'..."
-gh api repos/$REPO/environments/$ENV_NAME --method PUT -f wait_timer=0 -f prevent_self_review=false --silent
+gh api repos/$REPO/environments/$ENV_NAME --method PUT -F wait_timer=0 -F prevent_self_review=false --silent
 
 if [[ $? -eq 0 ]]; then
     echo "✅ Environment '$ENV_NAME' created successfully"
