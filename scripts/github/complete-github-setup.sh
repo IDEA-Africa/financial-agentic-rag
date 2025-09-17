@@ -122,6 +122,31 @@ else
 fi
 
 
+# Verify that the new workflow is available on GitHub before finishing
+echo ""
+print_status "Verifying workflow is available on GitHub..."
+WORKFLOW_FILE="test-ssh-deployment.yml"
+REPO="IDEA-Africa/financial-agentic-rag"
+MAX_ATTEMPTS=10
+SLEEP_DURATION=6
+ATTEMPT=0
+
+while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
+    # Use `gh workflow view` which supports --ref to check the specific branch
+    if gh workflow view "$WORKFLOW_FILE" --repo "$REPO" --ref "$CURRENT_BRANCH" > /dev/null 2>&1; then
+        print_success "✅ Workflow '$WORKFLOW_FILE' is now available on GitHub on branch '$CURRENT_BRANCH'."
+        break
+    fi
+    ATTEMPT=$((ATTEMPT + 1))
+    if [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; then
+        print_status "Workflow not yet indexed by GitHub. Waiting ${SLEEP_DURATION}s... (Attempt $ATTEMPT/$MAX_ATTEMPTS)"
+        sleep $SLEEP_DURATION
+    else
+        print_warning "Could not verify workflow availability automatically. Please check the 'Actions' tab on GitHub."
+        break
+    fi
+done
+
 # Summary
 echo ""
 echo "🎉 GitHub Setup Phase (T002-T006) COMPLETED!"
@@ -147,7 +172,8 @@ echo "  gh variable list --repo IDEA-Africa/financial-agentic-rag"
 echo "  gh api repos/IDEA-Africa/financial-agentic-rag/environments"
 echo ""
 echo "🧪 Next Steps:"
-echo "  1. Test SSH deployment: gh workflow run test-ssh-deployment.yml --repo IDEA-Africa/financial-agentic-rag"
+echo "  1. Test SSH deployment on your current branch:"
+echo "     gh workflow run test-ssh-deployment.yml --repo IDEA-Africa/financial-agentic-rag --ref $CURRENT_BRANCH"
 echo "  2. Proceed to Phase 2: GitHub Actions CI/CD Workflows (T007-T014)"
 echo "  3. Begin MCP server implementation (T015+)"
 echo ""
