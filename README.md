@@ -61,7 +61,8 @@ Our Finacial AI Agentic RAG puts AI analytics within reach across the financial 
 - Kubernetes cluster with GPU support
 - Helm 3.x
 - Docker and docker-compose
-  ![alt text](./kubernetes deployment.png)
+
+![alt text](./kubernetes-deployment.png)
 
 ### Option 1: Full Kubernetes Deployment
 ```bash
