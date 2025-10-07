@@ -63,7 +63,9 @@ Our Finacial AI Agentic RAG puts AI analytics within reach across the financial 
 - Docker and docker-compose
 
 ![alt text](./kubernetes-deployment.png)
-https://github.com/user-attachments/assets/2e7f05bf-7e38-4c32-993e-6be1627d40bc
+<video src="https://github.com/user-attachments/assets/2e7f05bf-7e38-4c32-993e-6be1627d40bc" controls>
+  Your browser does not support the video tag.
+</video>
 
 ### Option 1: Full Kubernetes Deployment
 ```bash
